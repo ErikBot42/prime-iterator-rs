@@ -1,4 +1,3 @@
-
 pub fn gen_primes() {
     //let mut num_iter: Box<dyn Iterator<Item = usize>> = Box::new((2..).into_iter());
     //for _ in 0..10 {
@@ -37,20 +36,24 @@ impl Iterator for PrimeIterator {
 
 use itertools::iterate;
 use std::cell::RefCell;
-fn make_prime_iter() -> Box<dyn Iterator<Item = usize>> {
-    let init: RefCell<Option<Box<dyn Iterator<Item = usize>>>> = RefCell::new(Some(Box::new(2..)));
-    Box::new(
-        iterate((0, init), |(_, old)| {
+
+fn make_prime_iter() -> impl Iterator<Item = usize> {
+    iterate(
+        (
+            0,
+            RefCell::new(Some(Box::new(2_usize..) as Box<dyn Iterator<Item = usize>>)),
+        ),
+        |(_, old)| {
             let mut new = old.take().unwrap();
             let prime = new.next().unwrap();
             (
                 prime,
                 RefCell::new(Some(Box::new(new.filter(move |x| x % prime != 0)))),
             )
-        })
-        .skip(1)
-        .map(|(nxt, _)| nxt),
+        },
     )
+    .skip(1)
+    .map(|(nxt, _)| nxt)
 }
 //impl Iterator for Fibonacci {
 //    // We can refer to this type using Self::Item
@@ -81,7 +84,5 @@ mod tests {
     #[test]
     fn it_works() {
         gen_primes();
-        let result = add(2, 2);
-        assert_eq!(result, 4);
     }
 }
