@@ -1,17 +1,7 @@
-pub fn gen_primes() {
-    //let mut num_iter: Box<dyn Iterator<Item = usize>> = Box::new((2..).into_iter());
-    //for _ in 0..10 {
-    //    let nxt = num_iter.next().unwrap();
-    //    num_iter = Box::new(num_iter.filter(move |x| x % nxt != 0));
-    //    println!("{}", nxt);
-    //}
-
-    //for prime in PrimeIterator::new() {
-    for prime in make_prime_iter().take(20) {
+pub fn print_primes() {
+    for prime in SieveIterator::new().skip(1_000_000).take(20) {
         println!("{}", prime);
     }
-
-    // iter,
 }
 
 struct PrimeIterator {
@@ -34,17 +24,15 @@ impl Iterator for PrimeIterator {
     }
 }
 
-use itertools::iterate;
 use std::cell::RefCell;
-
 fn make_prime_iter() -> impl Iterator<Item = usize> {
-    iterate(
+    itertools::iterate(
         (
             0,
             RefCell::new(Some(Box::new(2_usize..) as Box<dyn Iterator<Item = usize>>)),
         ),
-        |(_, old)| {
-            let mut new = old.take().unwrap();
+        |(_, prev)| {
+            let mut new = prev.take().unwrap();
             let prime = new.next().unwrap();
             (
                 prime,
@@ -53,36 +41,90 @@ fn make_prime_iter() -> impl Iterator<Item = usize> {
         },
     )
     .skip(1)
-    .map(|(nxt, _)| nxt)
+    .map(|(n, _)| n)
 }
-//impl Iterator for Fibonacci {
-//    // We can refer to this type using Self::Item
-//    type Item = u32;
-//
-//    // Here, we define the sequence using `.curr` and `.next`.
-//    // The return type is `Option<T>`:
-//    //     * When the `Iterator` is finished, `None` is returned.
-//    //     * Otherwise, the next value is wrapped in `Some` and returned.
-//    // We use Self::Item in the return type, so we can change
-//    // the type without having to update the function signatures.
-//    fn next(&mut self) -> Option<Self::Item> {
-//        let current = self.curr;
-//
-//        self.curr = self.next;
-//        self.next = current + self.next;
-//
-//        // Since there's no endpoint to a Fibonacci sequence, the `Iterator`
-//        // will never return `None`, and `Some` is always returned.
-//        Some(current)
-//    }
-//}
+use std::rc::Rc;
+
+fn make_prime_iter_vec() -> impl Iterator<Item = usize> {
+    let v = Rc::new(RefCell::new(Vec::new()));
+    itertools::iterate((2, v), |(mut i, v)| {
+        v.borrow_mut().push(i);
+        while {
+            i += 1;
+            v.borrow().iter().any(|p| i % p == 0)
+        } {}
+        (i, v.clone())
+    })
+    .map(|(i, _)| i)
+}
+
+struct SieveIterator {
+    primes: Vec<usize>,
+    flags: Vec<bool>,
+    index: usize,
+}
+impl SieveIterator {
+    fn new() -> Self {
+        SieveIterator {
+            primes: Vec::new(),
+            flags: vec![false],
+            index: 0_usize.wrapping_sub(1),
+        }
+    }
+    fn double_size(primes: &mut Vec<usize>, flag: &mut Vec<bool>) {
+        let old_len = flag.len();
+        flag.extend((0..old_len).map(|_| true));
+        let max_size = flag.len();
+        let flag_slice = &mut flag[0..max_size];
+        primes.iter_mut().for_each(|prime| {
+            [false]
+                .iter_mut()
+                .chain(&mut *flag_slice)
+                .skip((old_len / *prime) * *prime)
+                .step_by(*prime)
+                .for_each(|b| *b = false);
+        });
+        for i in old_len..max_size {
+            if flag[i] {
+                flag[i] = false;
+                let prime = i + 1;
+                primes.push(prime);
+                for j in (2 * prime - 1..max_size).into_iter().step_by(prime) {
+                    flag[j] = false;
+                }
+            }
+        }
+    }
+}
+impl Iterator for SieveIterator {
+    type Item = usize;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.index = self.index.wrapping_add(1);
+        Some(match self.primes.get(self.index).copied() {
+            Some(p) => p,
+            None => {
+                Self::double_size(&mut self.primes, &mut self.flags);
+                self.primes.get(self.index).copied()?
+            }
+        })
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
-        gen_primes();
+    fn compare_iterators() {
+        for (((a, b), c), d) in make_prime_iter()
+            .zip(make_prime_iter_vec())
+            .zip(PrimeIterator::new())
+            .zip(SieveIterator::new())
+            .take(1000)
+        {
+            assert_eq!(a, b);
+            assert_eq!(a, c);
+            assert_eq!(a, d);
+        }
     }
 }

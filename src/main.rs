@@ -1,4 +1,4 @@
-use prime_iterator_rs::gen_primes;
+use prime_iterator_rs::print_primes;
 fn main() {
-    gen_primes();
+    print_primes();
 }
