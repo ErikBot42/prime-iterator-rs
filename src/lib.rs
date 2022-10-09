@@ -1,5 +1,5 @@
 pub fn print_primes() {
-    for prime in SieveIterator::new().skip(1_000_000).take(20) {
+    for prime in SieveIterator::new().skip(10_000_000).take(20) {
         println!("{}", prime);
     }
 }
@@ -71,30 +71,30 @@ impl SieveIterator {
             index: 0_usize.wrapping_sub(1),
         }
     }
-    fn double_size(primes: &mut Vec<usize>, flag: &mut Vec<bool>) {
-        let old_len = flag.len();
-        flag.extend((0..old_len).map(|_| true));
-        let max_size = flag.len();
-        let flag_slice = &mut flag[0..max_size];
-        primes.iter_mut().for_each(|prime| {
-            [false]
-                .iter_mut()
-                .chain(&mut *flag_slice)
-                .skip((old_len / *prime) * *prime)
-                .step_by(*prime)
-                .for_each(|b| *b = false);
-        });
-        for i in old_len..max_size {
-            if flag[i] {
-                flag[i] = false;
-                let prime = i + 1;
-                primes.push(prime);
-                for j in (2 * prime - 1..max_size).into_iter().step_by(prime) {
-                    flag[j] = false;
-                }
-            }
-        }
-    }
+    //fn double_size(primes: &mut Vec<usize>, flag: &mut Vec<bool>) {
+    //    let old_len = flag.len();
+    //    flag.extend((0..old_len).map(|_| true));
+    //    let max_size = flag.len();
+    //    let flag_slice = &mut flag[0..max_size];
+    //    primes.iter_mut().for_each(|prime| {
+    //        [false]
+    //            .iter_mut()
+    //            .chain(&mut *flag_slice)
+    //            .skip((old_len / *prime) * *prime)
+    //            .step_by(*prime)
+    //            .for_each(|b| *b = false);
+    //    });
+    //    for i in old_len..max_size {
+    //        if flag[i] {
+    //            flag[i] = false;
+    //            let prime = i + 1;
+    //            primes.push(prime);
+    //            for j in (2 * prime - 1..max_size).into_iter().step_by(prime) {
+    //                flag[j] = false;
+    //            }
+    //        }
+    //    }
+    //}
 }
 impl Iterator for SieveIterator {
     type Item = usize;
@@ -103,7 +103,29 @@ impl Iterator for SieveIterator {
         Some(match self.primes.get(self.index).copied() {
             Some(p) => p,
             None => {
-                Self::double_size(&mut self.primes, &mut self.flags);
+                {
+                    let old_size = self.flags.len();
+                    self.flags.extend((0..old_size).map(|_| true));
+                    let new_size = self.flags.len();
+                    self.primes.iter_mut().for_each(|prime| {
+                        [false]
+                            .iter_mut()
+                            .chain(self.flags.iter_mut())
+                            .skip((old_size / *prime) * *prime)
+                            .step_by(*prime)
+                            .for_each(|b| *b = false);
+                    });
+                    for i in old_size..new_size {
+                        if self.flags[i] {
+                            self.flags[i] = false;
+                            let prime = i + 1;
+                            self.primes.push(prime);
+                            for j in (2 * prime - 1..new_size).into_iter().step_by(prime) {
+                                self.flags[j] = false;
+                            }
+                        }
+                    }
+                };
                 self.primes.get(self.index).copied()?
             }
         })
